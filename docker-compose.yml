@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # Broker Pub/Sub (Python) - Parte 2
+  broker:
+    container_name: messaging-broker
+    build:
+      context: ./broker
+      dockerfile: Dockerfile
+    ports:
+      - "5557:5557"  # XSUB - recebe de publishers
+      - "5558:5558"  # XPUB - envia para subscribers
+    networks:
+      - messaging-network
+    restart: unless-stopped
+
+  # Server Request-Reply + Publisher (Go)
+  server:
+    container_name: messaging-server
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "5555:5555"  # REQ-REP
+    volumes:
+      - server-data:/data
+    depends_on:
+      - broker
+    networks:
+      - messaging-network
+    restart: unless-stopped
+
+  # Client interativo (Node.js)
+  client:
+    container_name: messaging-client
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    environment:
+      - SERVER_URL=tcp://server:5555
+      - BROKER_URL=tcp://broker:5558
+    depends_on:
+      - server
+      - broker
+    networks:
+      - messaging-network
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  # Cliente automatizado - Réplica 1 (Python)
+  auto-client-1:
+    container_name: messaging-auto-client-1
+    build:
+      context: ./client
+      dockerfile: Dockerfile.auto
+    depends_on:
+      - server
+      - broker
+    networks:
+      - messaging-network
+    restart: unless-stopped
+
+  # Cliente automatizado - Réplica 2 (Python)
+  auto-client-2:
+    container_name: messaging-auto-client-2
+    build:
+      context: ./client
+      dockerfile: Dockerfile.auto
+    depends_on:
+      - server
+      - broker
+    networks:
+      - messaging-network
+    restart: unless-stopped
+
+  # Proxy vazio por enquanto (próximas partes)
+  proxy:
+    container_name: messaging-proxy
+    image: alpine:latest
+    command: echo "Proxy será implementado nas próximas partes"
+    networks:
+      - messaging-network
+
+volumes:
+  server-data:
+    driver: local
+
+networks:
+  messaging-network:
+    driver: bridge
