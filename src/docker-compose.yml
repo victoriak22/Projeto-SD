@@ -1,0 +1,155 @@
+services:
+  # Servidor de Referência (Python) - Parte 4 Etapa 2
+  reference:
+    container_name: messaging-reference
+    build:
+      context: ./reference
+      dockerfile: Dockerfile
+    ports:
+      - "5559:5559"  # REP para servidores
+    volumes:
+      - reference-data:/data
+    networks:
+      - messaging-network
+    restart: unless-stopped
+
+  # Broker Pub/Sub (Python) - Parte 2
+  broker:
+    container_name: messaging-broker
+    build:
+      context: ./broker
+      dockerfile: Dockerfile
+    ports:
+      - "5557:5557"  # XSUB - recebe de publishers
+      - "5558:5558"  # XPUB - envia para subscribers
+    networks:
+      - messaging-network
+    restart: unless-stopped
+
+  # Server 1 - Request-Reply + Publisher (Go)
+  server-1:
+    container_name: messaging-server-1
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "5555:5555"  # REQ-REP
+    volumes:
+      - server-1-data:/data
+    environment:
+      - REFERENCE_URL=tcp://reference:5559
+      - BROKER_URL=tcp://broker:5557
+      - SERVER_NAME=server-1
+      - SERVER_PORT=5555
+    depends_on:
+      - broker
+      - reference
+    networks:
+      - messaging-network
+    restart: unless-stopped
+
+  # Server 2 - Request-Reply + Publisher (Go)
+  server-2:
+    container_name: messaging-server-2
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "5556:5555"  # REQ-REP (porta externa diferente)
+    volumes:
+      - server-2-data:/data
+    environment:
+      - REFERENCE_URL=tcp://reference:5559
+      - BROKER_URL=tcp://broker:5557
+      - SERVER_NAME=server-2
+      - SERVER_PORT=5555
+    depends_on:
+      - broker
+      - reference
+    networks:
+      - messaging-network
+    restart: unless-stopped
+
+  # Server 3 - Request-Reply + Publisher (Go)
+  server-3:
+    container_name: messaging-server-3
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "5557:5555"  # REQ-REP (porta externa diferente)
+    volumes:
+      - server-3-data:/data
+    environment:
+      - REFERENCE_URL=tcp://reference:5559
+      - BROKER_URL=tcp://broker:5557
+      - SERVER_NAME=server-3
+      - SERVER_PORT=5555
+    depends_on:
+      - broker
+      - reference
+    networks:
+      - messaging-network
+    restart: unless-stopped
+
+  # Client interativo (Node.js)
+  client:
+    container_name: messaging-client
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    environment:
+      - SERVER_URL=tcp://server:5555
+      - BROKER_URL=tcp://broker:5558
+    depends_on:
+      - server
+      - broker
+    networks:
+      - messaging-network
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  # Cliente automatizado - Réplica 1 (Python)
+  auto-client-1:
+    container_name: messaging-auto-client-1
+    build:
+      context: ./client
+      dockerfile: Dockerfile.auto
+    depends_on:
+      - server
+      - broker
+    networks:
+      - messaging-network
+    restart: unless-stopped
+
+  # Cliente automatizado - Réplica 2 (Python)
+  auto-client-2:
+    container_name: messaging-auto-client-2
+    build:
+      context: ./client
+      dockerfile: Dockerfile.auto
+    depends_on:
+      - server
+      - broker
+    networks:
+      - messaging-network
+    restart: unless-stopped
+
+  # Proxy vazio por enquanto (próximas partes)
+  proxy:
+    container_name: messaging-proxy
+    image: alpine:latest
+    command: echo "Proxy será implementado nas próximas partes"
+    networks:
+      - messaging-network
+
+volumes:
+  server-data:
+    driver: local
+  reference-data:
+    driver: local
+
+networks:
+  messaging-network:
+    driver: bridge
