@@ -9,6 +9,7 @@ import msgpack
 import time
 import random
 import logging
+import os
 import sys
 from datetime import datetime
 
@@ -51,7 +52,6 @@ MESSAGES = [
     "Mensagem de teste automática"
 ]
 
-# Nomes de usuários aleatórios
 USER_PREFIXES = ["bot", "auto", "test", "user", "client"]
 
 
@@ -65,10 +65,6 @@ def generate_username():
 def send_request(socket, request):
     """Envia requisição e recebe resposta"""
     try:
-        # Adicionar clock antes de enviar
-        if 'data' in request:
-            request['data']['clock'] = increment_clock()
-        
         packed = msgpack.packb(request)
         socket.send(packed)
         response_data = socket.recv()
@@ -86,31 +82,45 @@ def send_request(socket, request):
 
 def login(socket, username):
     """Faz login no sistema"""
+    global logical_clock
+    
+    # ✅ CORRIGIDO: campos em minúsculo e timestamp adicionado
     request = {
         "service": "login",
         "data": {
-            "user": username,
-            "timestamp": int(time.time())
+            "user": username,                    # ✅ minúsculo!
+            "timestamp": int(time.time()),       # ✅ adicionado!
+            "clock": increment_clock()           # ✅ minúsculo!
         }
     }
     
     logger.info(f"🔐 Tentando login como: {username}")
-    response = send_request(socket, request)
+    logger.debug(f"📦 Payload: {request}")  # Debug
     
-    if response and response.get("data", {}).get("status") == "sucesso":
+    packed = msgpack.packb(request, use_bin_type=True)
+    socket.send(packed)
+    
+    response_data = socket.recv()
+    response = msgpack.unpackb(response_data, raw=False)
+    
+    # Atualizar relógio lógico
+    if "data" in response and "clock" in response["data"]:
+        update_clock(response["data"]["clock"])
+    
+    if response.get("data", {}).get("status") == "sucesso":
         logger.info(f"✅ Login realizado: {username}")
         return True
     else:
         logger.warning(f"❌ Erro no login: {response}")
         return False
 
-
 def get_channels(socket):
     """Obtém lista de canais disponíveis"""
     request = {
         "service": "channels",
         "data": {
-            "timestamp": int(time.time())
+            "timestamp": int(time.time()),
+            "clock": increment_clock()
         }
     }
     
@@ -121,7 +131,7 @@ def get_channels(socket):
         logger.info(f"📺 Canais disponíveis: {channels}")
         return channels
     else:
-        logger.warning("⚠️  Nenhum canal encontrado")
+        logger.warning("⚠️ Nenhum canal encontrado")
         return []
 
 
@@ -131,7 +141,8 @@ def create_channel(socket, channel_name):
         "service": "channel",
         "data": {
             "channel": channel_name,
-            "timestamp": int(time.time())
+            "timestamp": int(time.time()),
+            "clock": increment_clock()
         }
     }
     
@@ -154,7 +165,8 @@ def publish_message(socket, username, channel, message):
             "user": username,
             "channel": channel,
             "message": message,
-            "timestamp": int(time.time())
+            "timestamp": int(time.time()),
+            "clock": increment_clock()
         }
     }
     
@@ -172,7 +184,6 @@ def main():
     """Função principal do cliente automatizado"""
     logger.info("🤖 Iniciando cliente automatizado...")
     
-    # Configuração
     server_url = os.getenv("SERVER_URL", "tcp://server-1:5555")
     username = generate_username()
     
@@ -183,7 +194,7 @@ def main():
     logger.info(f"🔌 Conectando ao servidor: {server_url}")
     socket.connect(server_url)
     
-    # Aguardar conexão
+    # Esperar estabilização
     time.sleep(2)
     
     # Fazer login
@@ -191,10 +202,9 @@ def main():
         logger.error("❌ Falha no login. Encerrando...")
         return
     
-    # Aguardar um pouco
     time.sleep(1)
     
-    # Criar alguns canais iniciais se não existirem
+    # Criar canais padrão
     initial_channels = ["geral", "random", "tech", "bots"]
     for channel in initial_channels:
         create_channel(socket, channel)
@@ -202,22 +212,18 @@ def main():
     
     logger.info("🔄 Iniciando loop de mensagens...")
     
-    # Loop infinito de envio de mensagens
     message_count = 0
     while True:
         try:
-            # Obter canais disponíveis
             channels = get_channels(socket)
             
             if not channels:
-                logger.warning("⚠️  Nenhum canal disponível. Aguardando...")
+                logger.warning("⚠️ Nenhum canal disponível. Aguardando...")
                 time.sleep(5)
                 continue
             
-            # Escolher canal aleatório
             channel = random.choice(channels)
             
-            # Enviar 10 mensagens
             for i in range(10):
                 message = random.choice(MESSAGES)
                 
@@ -225,11 +231,9 @@ def main():
                     message_count += 1
                     logger.info(f"📊 Total: {message_count} msgs | Clock: {logical_clock}")
                 
-                # Intervalo entre mensagens
                 time.sleep(random.uniform(1, 3))
             
-            # Pausa maior entre ciclos
-            logger.info("⏸️  Pausa entre ciclos...")
+            logger.info("⏸️ Pausa entre ciclos...")
             time.sleep(random.uniform(5, 10))
             
         except KeyboardInterrupt:
@@ -239,7 +243,6 @@ def main():
             logger.error(f"❌ Erro no loop: {e}")
             time.sleep(5)
     
-    # Fechar socket
     socket.close()
     context.term()
     logger.info("✅ Cliente automatizado encerrado")
