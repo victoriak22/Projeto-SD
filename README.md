@@ -15,435 +15,650 @@ Este projeto implementa um sistema completo de mensagens distribuídas com:
 
 ---
 
-## 📋 Parte 1: Request-Reply ✅
+## 🚀 Como Usar
 
-Implementação do padrão Request-Reply para comunicação entre cliente e servidor.
+### Pré-requisitos
 
-### Funcionalidades Implementadas
+- Docker
+- Docker Compose
 
-- ✅ **Login de usuários**: Cadastro de novos usuários no sistema
-- ✅ **Listagem de usuários**: Visualização de todos os usuários cadastrados
-- ✅ **Criação de canais**: Criação de novos canais de comunicação
-- ✅ **Listagem de canais**: Visualização de todos os canais disponíveis
-- ✅ **Persistência de dados**: Armazenamento em disco de logins e canais
+### Método 1: Inicialização Rápida (Recomendado)
 
----
+```bash
+# 1. Parar tudo (se houver algo rodando)
+docker-compose down
 
-## 📋 Parte 2: Publisher-Subscriber ✅
+# 2. Subir serviços de backend em background
+docker-compose up -d broker server-1 server-2 server-3 reference auto-client-1 auto-client-2
 
-Implementação do padrão Pub/Sub para troca de mensagens entre usuários.
+# 3. Aguardar inicialização (3-5 segundos)
+sleep 5
 
-### Funcionalidades Implementadas
-
-- ✅ **Broker Pub/Sub**: Proxy XSUB/XPUB para distribuição de mensagens
-- ✅ **Publicação em canais**: Usuários podem publicar mensagens em canais públicos
-- ✅ **Mensagens diretas**: Envio de mensagens privadas entre usuários
-- ✅ **Inscrição em canais**: Usuários podem se inscrever em canais para receber mensagens
-- ✅ **Cliente automatizado**: Bots que geram mensagens aleatórias para testes
-- ✅ **Persistência de mensagens**: Todas as mensagens são armazenadas em disco
-
----
-
-## 📋 Parte 3: MessagePack ✅
-
-Otimização da serialização de mensagens usando MessagePack ao invés de JSON.
-
-### Funcionalidades Implementadas
-
-- ✅ **Serialização eficiente**: Mensagens em formato binário (MessagePack)
-- ✅ **Compatibilidade entre linguagens**: Go, JavaScript e Python usando MessagePack
-- ✅ **Redução de tamanho**: Mensagens ~25% menores que JSON
-- ✅ **Melhor performance**: Serialização/deserialização mais rápida
-- ✅ **Transparente**: Mesma funcionalidade, formato diferente
-
-### Comparação de Tamanho
-
-**Exemplo: Login Request**
-
-JSON (60 bytes):
-```json
-{"service":"login","data":{"user":"alice","timestamp":1234567890}}
+# 4. Rodar cliente interativo
+docker-compose run --rm client
 ```
 
-MessagePack (~45 bytes - 25% menor):
-```
-\x82\xa7service\xa5login\xa4data\x82\xa4user\xa5alice\xa9timestamp\xce\x49\x96\x02\xd2
-```
+### Método 2: Script Automatizado
 
-**Vantagens do MessagePack**:
-- 📉 Mensagens menores (15-30% de redução)
-- ⚡ Serialização/deserialização mais rápida
-- 🔄 Compatível entre diferentes linguagens
-- 💾 Menos uso de banda e memória
+Salve este conteúdo em `start-client.sh`:
 
----
-
-## 📋 Parte 4: Relógios ✅
-
-Implementação de relógios lógicos e físicos para sincronização em sistemas distribuídos.
-
-### Etapa 1: Relógio Lógico de Lamport ✅
-
-Implementação de relógios lógicos para ordenação de eventos distribuídos.
-
-#### Funcionalidades
-
-- ✅ **Relógio lógico em todos os processos**: Server, Client e Auto-client
-- ✅ **Incremento antes de enviar**: `clock++` antes de cada envio
-- ✅ **Atualização ao receber**: `clock = max(local, recebido) + 1`
-- ✅ **Campo clock em todas as mensagens**: Incluído em requests e responses
-- ✅ **Logs com clock**: Todas as operações mostram o valor do relógio lógico
-
-#### Como Funciona
-
-**Algoritmo de Lamport:**
-1. Cada processo mantém um contador (`logicalClock`)
-2. Antes de enviar mensagem: incrementa o contador
-3. Ao receber mensagem: `clock = max(clock_local, clock_recebido) + 1`
-
-**Exemplo:**
-```
-Cliente envia login (clock=1) → 
-Servidor recebe (atualiza para clock=2) →
-Servidor responde (clock=3) →
-Cliente recebe (atualiza para clock=4)
+```bash
+#!/bin/bash
+echo "🚀 Iniciando Sistema de Mensagens..."
+docker-compose down
+echo "⚙️  Iniciando serviços de backend..."
+docker-compose up -d broker server-1 server-2 server-3 reference auto-client-1 auto-client-2
+echo "⏳ Aguardando inicialização..."
+sleep 5
+echo "🎮 Iniciando cliente interativo..."
+docker-compose run --rm client
 ```
 
-### Etapa 2: Servidor de Referência ✅
-
-Novo componente para gerenciar registro e descoberta de servidores.
-
-#### Funcionalidades
-
-- ✅ **Novo container `reference`**: Servidor de referência em Python (porta 5559)
-- ✅ **Serviço `rank`**: Atribui rank único a cada servidor
-- ✅ **Serviço `list`**: Retorna lista de servidores ativos
-- ✅ **Serviço `heartbeat`**: Mantém lista de servidores atualizada
-- ✅ **Persistência**: Salva lista de servidores em disco
-- ✅ **Cleanup automático**: Remove servidores inativos (timeout 60s)
-- ✅ **Heartbeat periódico**: A cada 10 segundos
-
-#### Como Funciona
-
-**Registro:**
-1. Servidor inicia e conecta ao reference (porta 5559)
-2. Envia requisição `rank` com seu nome
-3. Reference atribui rank único (1, 2, 3, ...)
-4. Servidor armazena seu rank
-
-**Heartbeat:**
-- Servidor envia heartbeat a cada 10 segundos
-- Reference atualiza timestamp
-- Servidores sem heartbeat por 60s são removidos
-
-### Etapa 3: Múltiplos Servidores ✅
-
-Configuração de 3 réplicas do servidor para alta disponibilidade.
-
-#### Funcionalidades
-
-- ✅ **3 servidores independentes**: server-1, server-2, server-3
-- ✅ **Ranks únicos**: 1, 2, 3
-- ✅ **Dados independentes**: Cada servidor tem seu próprio volume
-- ✅ **Portas diferentes**: 5555, 5556, 5557 (externamente)
-- ✅ **Todos registrados**: Conectados ao reference
-- ✅ **Heartbeats simultâneos**: Todos enviam heartbeat periódico
-
-**Configuração:**
-```
-server-1: porta 5555, rank 1, volume server-1-data
-server-2: porta 5556, rank 2, volume server-2-data
-server-3: porta 5557, rank 3, volume server-3-data
+Depois:
+```bash
+chmod +x start-client.sh
+./start-client.sh
 ```
 
-### Etapa 4: Sincronização Berkeley ✅
+### Método 3: Inicialização Manual Passo a Passo
 
-Implementação do Algoritmo de Berkeley para sincronização de relógios físicos.
+```bash
+# Passo 1: Limpar ambiente
+docker-compose down
 
-#### Funcionalidades
+# Passo 2: Construir imagens (apenas primeira vez ou após mudanças)
+docker-compose build
 
-- ✅ **Coordenador eleito**: Servidor com maior rank
-- ✅ **Coleta de timestamps**: Coordenador pede tempo de todos
-- ✅ **Cálculo de média**: `média = soma(timestamps) / N`
-- ✅ **Distribuição de ajustes**: Envia ajuste individual para cada servidor
-- ✅ **Aplicação de ajustes**: Servidores ajustam seus relógios
-- ✅ **Sincronização periódica**: A cada 10 mensagens processadas
-- ✅ **Offset de tempo**: Mantém ajuste sem modificar relógio do sistema
+# Passo 3: Iniciar serviços essenciais
+docker-compose up -d reference
+sleep 2
 
-#### Como Funciona
+docker-compose up -d broker
+sleep 2
 
-**Algoritmo:**
-1. Coordenador coleta timestamps: `T1=100, T2=110, T3=105`
-2. Calcula média: `média = (100+110+105)/3 = 105`
-3. Calcula ajustes: `A1=+5, A2=-5, A3=0`
-4. Distribui ajustes para cada servidor
-5. Todos sincronizados: `T1'=105, T2'=105, T3'=105`
+docker-compose up -d server-1 server-2 server-3
+sleep 3
 
-**Logs esperados:**
-```
-🎯 Iniciando sincronização Berkeley como COORDENADOR
-📊 Coletando timestamps de 3 servidores...
-   📥 server-1: 100
-   📥 server-2: 110
-📊 Tempo médio calculado: 105
-   📤 Enviado ajuste de +5s para server-1
-   📤 Enviado ajuste de -5s para server-2
-✅ Sincronização Berkeley concluída
-```
+# Passo 4: Iniciar clientes automatizados (opcional)
+docker-compose up -d auto-client-1 auto-client-2
 
-### Etapa 5: Eleição Bully ✅
+# Passo 5: Verificar status
+docker-compose ps
 
-Implementação do Algoritmo Bully para eleição automática de coordenador.
-
-#### Funcionalidades
-
-- ✅ **Detecção de falha**: Verifica coordenador a cada 30 segundos
-- ✅ **Algoritmo Bully**: Eleição baseada em rank (maior vence)
-- ✅ **Mensagens de eleição**: Envia `election` para ranks maiores
-- ✅ **Resposta OK**: Servidores maiores respondem e iniciam própria eleição
-- ✅ **Anúncio de coordenador**: Publicado no tópico `servers`
-- ✅ **Subscrição ao tópico**: Todos os servidores recebem anúncios
-- ✅ **Atualização automática**: Todos atualizam coordenador atual
-- ✅ **Coordenador inicial**: Determinado ao iniciar (maior rank)
-
-#### Como Funciona
-
-**Algoritmo Bully:**
-1. Servidor detecta falha do coordenador
-2. Envia `election` para todos com rank maior
-3. Se alguém responde "OK": aguarda novo coordenador
-4. Se ninguém responde: torna-se coordenador
-5. Publica no tópico `servers`
-6. Todos recebem e atualizam
-
-**Exemplo:**
-```
-Estado inicial: server-3 (rank 3) é coordenador
-
-[server-3 falha]
-
-server-2 detecta → envia election → timeout → 
-se torna coordenador → publica no tópico 'servers'
-
-server-1 recebe anúncio → atualiza coordenador = server-2
-```
-
-**Logs esperados:**
-```
-⚠️ Coordenador server-3 não respondeu - iniciando eleição
-🗳️ Iniciando eleição Bully...
-👑 Ninguém respondeu. Me tornando coordenador!
-📢 Anúncio de coordenador publicado no tópico 'servers'
+# Passo 6: Iniciar cliente interativo
+docker-compose run --rm client
 ```
 
 ---
 
-## 📋 Parte 5: Consistência e Replicação ✅
+## 🎮 Usando o Cliente Interativo
 
-Implementação de replicação de dados para garantir que todos os servidores tenham cópia completa dos dados.
+Após executar qualquer dos métodos acima, você verá o menu:
 
-### Problema
-
-O broker distribui clientes entre servidores (load balancing). Consequentemente:
-- ❌ Cada servidor possui apenas parte das mensagens
-- ❌ Se um servidor falha, dados são perdidos
-- ❌ Clientes recebem histórico incompleto ao consultar um servidor específico
-
-### Solução Implementada
-
-**Método escolhido: Primary-Backup com Propagação Assíncrona**
-
-Adaptação do modelo Primary-Backup com as seguintes características:
-
-#### Características do Método
-
-1. **Primary (Coordenador)**: 
-   - Servidor com maior rank atua como primary
-   - Determinado pelo algoritmo Bully
-   - Responsável por coordenar sincronização
-
-2. **Backups**: 
-   - Todos os outros servidores são backups
-   - Recebem replicações do primary e de outros servidores
-   - Podem promover-se a primary via eleição
-
-3. **Propagação Assíncrona**:
-   - Replicação não bloqueia operações do usuário
-   - Executada em goroutines/threads separadas
-   - Melhor performance mas janela de inconsistência temporária
-
-4. **Sincronização Periódica**:
-   - A cada 60 segundos, backups sincronizam com coordenador
-   - Garante convergência para consistência eventual
-   - Resolve inconsistências e preenche lacunas
-
-5. **Tolerância a Falhas**:
-   - Eleição Bully garante novo primary automaticamente
-   - Replicação continua após eleição
-   - Dados não são perdidos
-
-### Funcionalidades Implementadas
-
-- ✅ **Replicação automática**: Dados replicados para todos os servidores ao salvar
-- ✅ **Sincronização periódica**: A cada 60s, servidores solicitam sincronização completa
-- ✅ **Sincronização sob demanda**: Serviço `sync` para sincronização manual
-- ✅ **Replicação assíncrona**: Não bloqueia operações do usuário
-- ✅ **Thread-safe**: Mutex protege acesso aos dados compartilhados
-- ✅ **Consistência eventual**: Todos os servidores convergem para o mesmo estado
-- ✅ **Merge inteligente**: Previne duplicatas usando timestamps
-
-### Tipos de Dados Replicados
-
-1. **Logins** (`login`): Novos usuários cadastrados
-2. **Canais** (`channel`): Novos canais criados
-3. **Mensagens de Canal** (`channel_message`): Publicações em canais
-4. **Mensagens Diretas** (`user_message`): Mensagens entre usuários
-
-### Fluxo de Replicação
-
-**Operação Normal:**
 ```
-1. Cliente faz login no server-1
-2. server-1 salva localmente
-3. server-1 replica assincronamente para server-2 e server-3
-4. server-2 e server-3 recebem e salvam
-5. Todos os servidores têm o login
+============================================================
+📱 SISTEMA DE MENSAGENS - MENU PRINCIPAL
+============================================================
+
+Opções:
+  1. Fazer login
+  0. Sair
+============================================================
 ```
 
-**Sincronização Periódica:**
+### Fluxo Típico de Uso
+
+#### 1. Fazer Login
 ```
-A cada 60 segundos:
-1. Backups (server-1, server-2) solicitam sync do coordenador (server-3)
-2. Coordenador envia todos os dados: logins, canais, mensagens
-3. Backups fazem merge com dados locais
-4. Duplicatas são ignoradas (usando timestamp + username/channel)
-5. Sistema converge para consistência
+Escolha uma opção: 1
+Digite seu nome de usuário: alice
+✅ Login realizado com sucesso!
 ```
 
-### Formato das Mensagens
+#### 2. Criar Canal
+```
+Escolha uma opção: 3
+Digite o nome do canal: geral
+✅ Canal criado com sucesso!
+```
 
-**Replicação:**
-```json
-{
-  "service": "replicate",
-  "data": {
-    "type": "login",
-    "content": {
-      "username": "alice",
-      "timestamp": 1234567890
-    },
-    "timestamp": 1234567890,
-    "clock": 42
-  }
+#### 3. Ver Canais Disponíveis
+```
+Escolha uma opção: 4
+
+📺 Canais disponíveis:
+  - geral
+  - tech
+  - random
+```
+
+#### 4. Inscrever-se em Canal (para receber mensagens)
+```
+Escolha uma opção: 7
+Digite o nome do canal: geral
+✅ Inscrito no canal #geral
+```
+
+#### 5. Publicar Mensagem em Canal
+```
+Escolha uma opção: 5
+Digite o nome do canal: geral
+Digite sua mensagem: Olá pessoal!
+✅ Mensagem publicada com sucesso!
+```
+
+#### 6. Ver Usuários Online
+```
+Escolha uma opção: 2
+
+👥 Usuários cadastrados:
+  - alice
+  - bob
+  - charlie
+```
+
+#### 7. Enviar Mensagem Direta
+```
+Escolha uma opção: 6
+Digite o nome do usuário: bob
+Digite sua mensagem: Oi Bob, tudo bem?
+✅ Mensagem enviada com sucesso!
+```
+
+#### 8. Sair
+```
+Escolha uma opção: 0
+👋 Encerrando cliente...
+```
+
+### Menu Completo
+
+```
+============================================================
+📱 MENU DO USUÁRIO: alice
+============================================================
+
+Opções:
+  1. Fazer login novamente
+  2. Listar usuários
+  3. Criar canal
+  4. Listar canais
+  5. Publicar em canal
+  6. Enviar mensagem direta
+  7. Inscrever-se em canal
+  0. Sair
+============================================================
+```
+
+---
+
+## 🧪 Testando o Sistema
+
+### Teste 1: Comunicação Básica (1 Cliente)
+
+```bash
+docker-compose run --rm client
+```
+
+1. Login como "alice"
+2. Criar canal "geral"
+3. Inscrever-se no canal "geral"
+4. Publicar mensagem "Olá!"
+5. Sair
+
+### Teste 2: Múltiplos Clientes (Pub/Sub)
+
+#### Terminal 1 - Alice
+```bash
+docker-compose run --rm client
+```
+1. Login: alice
+2. Criar canal: geral
+3. Inscrever-se: geral
+4. Aguardar mensagens...
+
+#### Terminal 2 - Bob
+```bash
+docker-compose run --rm client
+```
+1. Login: bob
+2. Inscrever-se: geral
+3. Publicar: "Oi Alice!"
+4. Ver mensagem chegando no Terminal 1
+
+#### Terminal 3 - Charlie
+```bash
+docker-compose run --rm client
+```
+1. Login: charlie
+2. Enviar DM para alice: "Mensagem privada!"
+
+### Teste 3: Replicação entre Servidores
+
+#### Terminal 1 - Cliente no Server-1
+```bash
+docker-compose run --rm -e SERVER_URL=tcp://server-1:5555 client
+```
+1. Login: teste_replicacao
+2. Criar canal: canal_teste
+
+#### Terminal 2 - Verificar Server-2
+```bash
+docker exec messaging-server-2 cat /data/server_data.json | grep teste_replicacao
+# Deve mostrar o usuário replicado!
+```
+
+#### Terminal 3 - Verificar Server-3
+```bash
+docker exec messaging-server-3 cat /data/server_data.json | grep canal_teste
+# Deve mostrar o canal replicado!
+```
+
+### Teste 4: Tolerância a Falhas (Eleição Bully)
+
+```bash
+# 1. Ver coordenador atual
+docker-compose logs server-3 | grep "Coordenador"
+
+# 2. Parar o coordenador (server-3 com rank 4)
+docker-compose stop server-3
+
+# 3. Aguardar 30-40 segundos
+
+# 4. Ver nova eleição nos logs
+docker-compose logs server-2 | grep "eleição"
+docker-compose logs server-1 | grep "eleição"
+
+# 5. Verificar novo coordenador (deve ser server-2 com rank 2)
+docker-compose logs server-2 | grep "coordenador"
+
+# 6. Reiniciar server-3
+docker-compose start server-3
+
+# 7. Aguardar e verificar que server-3 volta como coordenador
+docker-compose logs server-3 | tail -20
+```
+
+### Teste 5: Sincronização Berkeley
+
+```bash
+# 1. Fazer 10+ operações para forçar sincronização
+docker-compose run --rm client
+# Login, criar 3 canais, publicar 5 mensagens, etc.
+
+# 2. Ver logs de sincronização
+docker-compose logs server-3 | grep "Berkeley"
+
+# Deve mostrar:
+# 🎯 Iniciando sincronização Berkeley como COORDENADOR
+# 📊 Coletando timestamps...
+# ✅ Sincronização Berkeley concluída
+```
+
+### Teste 6: Clientes Automatizados
+
+```bash
+# Ver os auto-clients em ação
+docker-compose logs -f auto-client-1 auto-client-2
+
+# Deve mostrar:
+# ✅ Login realizado: bot_1234
+# ✅ Canal criado: geral
+# 📤 Publicado em #geral: Olá pessoal!
+```
+
+---
+
+## 📊 Monitoramento e Debug
+
+### Ver Logs em Tempo Real
+
+```bash
+# Todos os serviços
+docker-compose logs -f
+
+# Apenas servidores
+docker-compose logs -f server-1 server-2 server-3
+
+# Apenas um servidor
+docker-compose logs -f server-1
+
+# Servidor de referência
+docker-compose logs -f reference
+
+# Broker
+docker-compose logs -f broker
+
+# Clientes automatizados
+docker-compose logs -f auto-client-1 auto-client-2
+```
+
+### Verificar Status dos Containers
+
+```bash
+# Listar todos os containers
+docker-compose ps
+
+# Esperado:
+# messaging-reference       running   5559/tcp
+# messaging-broker          running   5557/tcp, 5558/tcp
+# messaging-server-1        running
+# messaging-server-2        running
+# messaging-server-3        running
+# messaging-auto-client-1   running
+# messaging-auto-client-2   running
+```
+
+### Verificar Dados Persistidos
+
+```bash
+# Ver dados do Server-1
+docker exec messaging-server-1 cat /data/server_data.json
+
+# Ver dados do Server-2
+docker exec messaging-server-2 cat /data/server_data.json
+
+# Ver dados do Server-3
+docker exec messaging-server-3 cat /data/server_data.json
+
+# Ver dados do Reference
+docker exec messaging-reference cat /data/reference_data.json
+
+# Buscar usuário específico
+docker exec messaging-server-1 cat /data/server_data.json | grep "alice"
+
+# Contar logins
+docker exec messaging-server-1 cat /data/server_data.json | jq '.logins | length'
+```
+
+### Verificar Relógios Lógicos
+
+```bash
+# Ver valores de clock nos logs
+docker-compose logs server-1 | grep "clock:"
+
+# Ver sincronização Berkeley
+docker-compose logs server-3 | grep "Berkeley"
+
+# Ver ajustes de tempo
+docker-compose logs | grep "Relógio ajustado"
+```
+
+### Verificar Replicação
+
+```bash
+# Ver tentativas de replicação
+docker-compose logs | grep "Replicando"
+
+# Ver dados replicados recebidos
+docker-compose logs | grep "replicado"
+
+# Ver sincronização completa
+docker-compose logs | grep "Sincronização"
+```
+
+---
+
+## 🛑 Parando o Sistema
+
+### Parar Apenas o Cliente
+
+```bash
+# No terminal do cliente, pressione Ctrl+C ou digite 0
+```
+
+### Parar Serviços de Backend
+
+```bash
+# Parar mantendo dados
+docker-compose stop
+
+# Parar e remover containers (mantém volumes)
+docker-compose down
+
+# Parar e remover TUDO incluindo dados
+docker-compose down -v
+```
+
+### Restart de Serviços Específicos
+
+```bash
+# Reiniciar um servidor
+docker-compose restart server-1
+
+# Reiniciar o broker
+docker-compose restart broker
+
+# Reiniciar reference
+docker-compose restart reference
+```
+
+---
+
+## 🔧 Comandos Úteis
+
+### Reconstruir Após Mudanças no Código
+
+```bash
+# Reconstruir tudo
+docker-compose build
+
+# Reconstruir sem cache
+docker-compose build --no-cache
+
+# Reconstruir apenas um serviço
+docker-compose build client
+docker-compose build server-1
+
+# Reconstruir e reiniciar
+docker-compose up -d --build server-1
+```
+
+### Limpar Completamente
+
+```bash
+# Parar tudo
+docker-compose down -v
+
+# Remover imagens órfãs
+docker image prune -f
+
+# Remover volumes órfãos
+docker volume prune -f
+
+# Reconstruir do zero
+docker-compose build --no-cache
+docker-compose up -d broker server-1 server-2 server-3 reference
+```
+
+### Acessar Shell de um Container
+
+```bash
+# Bash no servidor
+docker exec -it messaging-server-1 /bin/sh
+
+# Bash no reference
+docker exec -it messaging-reference /bin/sh
+
+# Bash no broker
+docker exec -it messaging-broker /bin/sh
+```
+
+### Copiar Arquivos
+
+```bash
+# Copiar dados do servidor para host
+docker cp messaging-server-1:/data/server_data.json ./server1_backup.json
+
+# Copiar código do host para container
+docker cp ./server/main.go messaging-server-1:/app/main.go
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### Problema: Cliente não aceita entrada
+
+**Sintoma:**
+```bash
+docker-compose up client
+# Menu aparece mas não consigo digitar
+```
+
+**Solução:**
+```bash
+# Use docker-compose run ao invés de up
+docker-compose run --rm client
+```
+
+### Problema: "Nome de usuário não pode ser vazio"
+
+**Sintoma:**
+```bash
+auto-client: ❌ Erro no login: Nome de usuário não pode ser vazio
+```
+
+**Solução:**
+Verifique se o `auto_client.py` usa campos em **minúsculo**:
+```python
+# ✅ Correto
+request = {
+    "service": "login",
+    "data": {
+        "user": username,              # minúsculo!
+        "timestamp": int(time.time()),
+        "clock": increment_clock()
+    }
 }
 ```
 
-**Sincronização Completa:**
+### Problema: Containers não conectam
 
-Request:
-```json
-{
-  "service": "sync",
-  "data": {
-    "last_sync": 1234567000,
-    "timestamp": 1234567890,
-    "clock": 50
-  }
-}
+**Sintoma:**
+```bash
+ERROR: Network messaging-network not found
 ```
 
-Response:
-```json
-{
-  "service": "sync",
-  "data": {
-    "logins": [
-      {"username": "alice", "timestamp": 1234567890},
-      {"username": "bob", "timestamp": 1234567895}
-    ],
-    "channels": ["geral", "tech"],
-    "channel_messages": [...],
-    "user_messages": [...],
-    "timestamp": 1234567890,
-    "clock": 51
-  }
-}
+**Solução:**
+```bash
+docker-compose down
+docker network prune -f
+docker-compose up -d broker server-1 server-2 server-3 reference
 ```
 
-### Modificações no Método Primary-Backup Tradicional
+### Problema: Mensagens não chegam
 
-**Diferenças do Primary-Backup clássico:**
+**Checklist:**
+1. ✅ Broker está rodando? `docker-compose ps broker`
+2. ✅ Cliente está inscrito no canal? (opção 7)
+3. ✅ Há publishers? `docker-compose logs broker`
 
-1. **Replicação Multi-Direcional**:
-   - Clássico: Apenas primary replica para backups
-   - **Nossa implementação**: Qualquer servidor pode replicar para outros
-   - Vantagem: Mesmo sem ser primary, servidor pode garantir dados replicados
+**Solução:**
+```bash
+# Reiniciar broker
+docker-compose restart broker
 
-2. **Sincronização Periódica Adicional**:
-   - Clássico: Apenas replicação sob demanda
-   - **Nossa implementação**: Sync periódica a cada 60s
-   - Vantagem: Autocorreção de inconsistências
-
-3. **Eleição Automática de Primary**:
-   - Clássico: Primary fixo ou manual
-   - **Nossa implementação**: Algoritmo Bully elege automaticamente
-   - Vantagem: Tolerância a falhas sem intervenção
-
-4. **Assíncrono com Consistência Eventual**:
-   - Clássico: Geralmente síncrono (bloqueante)
-   - **Nossa implementação**: Assíncrono para performance
-   - Trade-off: Janela de inconsistência aceitável
-
-### Vantagens
-
-✅ **Performance**: Replicação assíncrona não bloqueia cliente  
-✅ **Simplicidade**: Coordenador centraliza lógica de sincronização  
-✅ **Tolerância a Falhas**: Eleição automática + múltiplos backups  
-✅ **Consistência Eventual**: Sistema converge automaticamente  
-✅ **Escalabilidade**: Fácil adicionar novos servidores  
-✅ **Autocorreção**: Sincronização periódica corrige inconsistências  
-
-### Desvantagens e Trade-offs
-
-⚠️ **Janela de Inconsistência**: Breve período (< 60s) onde dados podem não estar em todos  
-⚠️ **Overhead de Rede**: Cada operação gera N-1 replicações  
-⚠️ **Duplicatas Possíveis**: Sync pode criar duplicatas temporárias (aceitáveis)  
-⚠️ **Não é ACID forte**: Consistência eventual, não imediata  
-
-### Garantias Fornecidas
-
-✅ **Disponibilidade**: Sistema continua funcionando com falhas  
-✅ **Partição**: Tolera partições de rede temporárias  
-✅ **Consistência Eventual**: Todos convergem para mesmo estado  
-✅ **Durabilidade**: Dados persistidos em múltiplos servidores  
-
-### Logs Esperados
-
+# Ver logs
+docker-compose logs -f broker
 ```
-Server-1 (recebe login):
-✅ Novo usuário cadastrado: alice (clock: 15)
-🔄 Replicando login para 2 servidores...
-   ✅ Replicado para server-2
-   ✅ Replicado para server-3
 
-Server-2 (recebe replicação):
-🔄 Login replicado: alice
+### Problema: Replicação não funciona
 
-Server-3 (recebe replicação):
-🔄 Login replicado: alice
+**Checklist:**
+1. ✅ 3 servidores rodando? `docker-compose ps | grep server`
+2. ✅ Reference ativo? `docker-compose ps reference`
+3. ✅ Coordenador definido? `docker-compose logs | grep Coordenador`
 
-[60 segundos depois]
+**Solução:**
+```bash
+# Ver logs de replicação
+docker-compose logs | grep -i "replic"
 
-Server-1 (sincronização periódica):
-🔄 Solicitando sincronização completa de server-3...
-✅ Sincronização recebida: 5 logins, 3 canais, 10 msgs canal, 5 msgs diretas
-🔄 Merge de dados locais com dados sincronizados
-✅ Sincronização completa concluída
+# Forçar sincronização
+docker-compose restart server-1 server-2 server-3
+```
+
+### Problema: Porta já em uso
+
+**Sintoma:**
+```bash
+ERROR: port is already allocated
+```
+
+**Solução:**
+```bash
+# Ver o que está usando a porta
+lsof -i :5559  # ou 5557, 5558
+
+# Parar processo
+kill -9 <PID>
+
+# Ou mudar porta no docker-compose.yml
+ports:
+  - "5560:5559"  # usa 5560 externamente
+```
+
+### Problema: Dados não persistem
+
+**Sintoma:**
+Após reiniciar, todos os dados sumiram.
+
+**Solução:**
+```bash
+# Verificar volumes
+docker volume ls | grep messaging
+
+# NÃO use -v ao parar
+docker-compose down  # ✅ mantém volumes
+docker-compose down -v  # ❌ APAGA volumes
+
+# Backup manual
+docker exec messaging-server-1 cat /data/server_data.json > backup.json
 ```
 
 ---
 
-## 🏗️ Arquitetura Completa
+## 📋 Funcionalidades Implementadas
+
+### Parte 1: Request-Reply ✅
+- ✅ Login de usuários
+- ✅ Listagem de usuários
+- ✅ Criação de canais
+- ✅ Listagem de canais
+- ✅ Persistência de dados
+
+### Parte 2: Publisher-Subscriber ✅
+- ✅ Broker Pub/Sub
+- ✅ Publicação em canais
+- ✅ Mensagens diretas
+- ✅ Inscrição em canais
+- ✅ Cliente automatizado
+- ✅ Persistência de mensagens
+
+### Parte 3: MessagePack ✅
+- ✅ Serialização eficiente
+- ✅ Compatibilidade entre linguagens
+- ✅ Redução de tamanho (~25%)
+- ✅ Melhor performance
+
+### Parte 4: Relógios ✅
+- ✅ Relógio Lógico de Lamport
+- ✅ Servidor de Referência
+- ✅ Múltiplos Servidores (3x)
+- ✅ Sincronização Berkeley
+- ✅ Eleição Bully
+
+### Parte 5: Consistência e Replicação ✅
+- ✅ Replicação automática
+- ✅ Sincronização periódica
+- ✅ Primary-Backup adaptado
+- ✅ Consistência eventual
+- ✅ Tolerância a falhas
+
+---
+
+## 🏗️ Arquitetura
 
 ```
                     ┌─────────────┐
@@ -453,7 +668,7 @@ Server-1 (sincronização periódica):
                          ↕ REQ/REP
         ┌────────────────┼────────────────┐
         ↓                ↓                ↓
-   Server-1         Server-2         Server-3 (Primary/Coordenador)
+   Server-1         Server-2         Server-3
    rank=1           rank=2           rank=3
    :5555            :5556            :5557
         ↓                ↓                ↓
@@ -474,104 +689,16 @@ Server-1 (sincronização periódica):
            (Node.js)        (Python)
 ```
 
-### Componentes
-
-- **Reference**: Registro de servidores, ranks, heartbeats
-- **Servers (3x)**: Request-Reply + Publisher + Replicação
-- **Broker**: Pub/Sub proxy (XSUB/XPUB)
-- **Client**: Interface CLI interativa
-- **Auto-clients**: Bots geradores de carga
-
 ---
 
 ## 🛠️ Tecnologias
 
-- **Server**: Go 1.21 + ZeroMQ (REP + PUB) + MessagePack
-- **Client**: Node.js 20 + ZeroMQ (REQ + SUB) + MessagePack
-- **Broker**: Python 3.11 + ZeroMQ (XSUB/XPUB)
-- **Reference**: Python 3.11 + ZeroMQ (REP) + MessagePack
-- **Auto-client**: Python 3.11 + ZeroMQ (REQ) + MessagePack
-- **Comunicação**: ZeroMQ (Request-Reply + Pub/Sub)
-- **Serialização**: MessagePack (binário, eficiente)
-- **Persistência**: JSON (legível)
+- **Server**: Go 1.21 + ZeroMQ + MessagePack
+- **Client**: Node.js 20 + ZeroMQ + MessagePack
+- **Broker**: Python 3.11 + ZeroMQ
+- **Reference**: Python 3.11 + ZeroMQ + MessagePack
+- **Auto-client**: Python 3.11 + ZeroMQ + MessagePack
 - **Containerização**: Docker + Docker Compose
-
-### Bibliotecas MessagePack
-
-- **Go**: `github.com/vmihailenco/msgpack/v5`
-- **JavaScript**: `@msgpack/msgpack`
-- **Python**: `msgpack`
-
----
-
-## 🚀 Como Executar
-
-### Pré-requisitos
-
-- Docker
-- Docker Compose
-
-### Iniciar o Sistema Completo
-
-```bash
-# Construir e iniciar todos os containers
-docker-compose up --build
-
-# Executar em background
-docker-compose up -d --build
-```
-
-### Interagir com o Cliente
-
-```bash
-# Acessar cliente interativo
-docker exec -it messaging-client npm start
-
-# Ou criar novo cliente
-docker-compose run --rm client npm start
-```
-
-### Testar Múltiplos Clientes
-
-```bash
-# Terminal 1 - Alice
-docker-compose run --rm client npm start
-
-# Terminal 2 - Bob
-docker-compose run --rm client npm start
-
-# Terminal 3 - Charlie
-docker-compose run --rm client npm start
-```
-
-### Ver Logs
-
-```bash
-# Todos os serviços
-docker-compose logs -f
-
-# Servidores
-docker-compose logs -f server-1 server-2 server-3
-
-# Reference
-docker-compose logs -f reference
-
-# Broker
-docker-compose logs -f broker
-
-# Clientes automatizados
-docker-compose logs -f auto-client-1 auto-client-2
-```
-
-### Parar o Sistema
-
-```bash
-# Parar containers
-docker-compose down
-
-# Limpar volumes (apaga dados)
-docker-compose down -v
-```
 
 ---
 
@@ -579,183 +706,26 @@ docker-compose down -v
 
 ```
 .
-├── reference/
-│   ├── main.py              # Servidor de referência (Python)
-│   ├── requirements.txt
-│   └── Dockerfile
-├── broker/
-│   ├── main.py              # Broker Pub/Sub (Python)
-│   ├── requirements.txt
-│   └── Dockerfile
-├── server/
-│   ├── main.go              # Servidor (Go)
-│   ├── go.mod
-│   └── Dockerfile
-├── client/
-│   ├── main.js              # Cliente interativo (Node.js)
-│   ├── auto_client.py       # Cliente automatizado (Python)
-│   ├── package.json
-│   ├── Dockerfile
-│   └── Dockerfile.auto
-├── proxy/
-│   └── main.py              # Placeholder
-├── docker-compose.yml       # Orquestração (6 containers)
-├── .gitignore
-├── README.md
-└── ARCHITECTURE.md
+├── reference/          # Servidor de referência
+├── broker/             # Broker Pub/Sub
+├── server/             # Servidor (Go)
+├── client/             # Cliente interativo + automatizado
+├── docker-compose.yml  # Orquestração
+└── README.md          # Este arquivo
 ```
 
 ---
 
-## 🧪 Testes Completos
+## 🎉 Status
 
-### Teste 1: Request-Reply (Parte 1)
-
-```bash
-docker-compose up --build
-docker-compose run --rm client npm start
-```
-
-1. Login como "alice"
-2. Criar canal "geral"
-3. Listar canais
-4. Listar usuários
-
-### Teste 2: Pub/Sub (Parte 2)
-
-```bash
-# Terminal 1 - Alice
-docker-compose run --rm client npm start
-# Login → Inscrever canal "geral" → Publicar mensagem
-
-# Terminal 2 - Bob
-docker-compose run --rm client npm start
-# Login → Inscrever canal "geral" → Ver mensagens → Enviar DM para Alice
-```
-
-### Teste 3: Relógios (Parte 4)
-
-```bash
-# Ver logs com clocks
-docker-compose logs server-1 | grep "clock:"
-
-# Fazer 10 operações para forçar sincronização Berkeley
-# Ver logs de sincronização
-docker-compose logs server-3 | grep "Berkeley"
-```
-
-### Teste 4: Eleição (Parte 4)
-
-```bash
-# Parar coordenador
-docker-compose stop server-3
-
-# Aguardar 30s e ver eleição
-docker-compose logs server-2 | grep "eleição"
-
-# Deve mostrar: server-2 se torna coordenador
-```
-
-### Teste 5: Replicação (Parte 5)
-
-```bash
-# 1. Fazer login em server-1
-docker-compose run --rm -e SERVER_URL=tcp://server-1:5555 client npm start
-# Login como "teste_replicacao"
-
-# 2. Verificar replicação nos logs
-docker-compose logs server-1 | grep "Replicando"
-docker-compose logs server-2 | grep "replicado"
-docker-compose logs server-3 | grep "replicado"
-
-# 3. Verificar dados em todos os servidores
-docker exec messaging-server-1 cat /data/server_data.json | grep "teste_replicacao"
-docker exec messaging-server-2 cat /data/server_data.json | grep "teste_replicacao"
-docker exec messaging-server-3 cat /data/server_data.json | grep "teste_replicacao"
-
-# Todos devem ter o usuário!
-```
-
----
-
-## 📊 Logs e Debug
-
-```bash
-# Ver dados persistidos
-docker exec messaging-server-1 cat /data/server_data.json
-docker exec messaging-server-2 cat /data/server_data.json
-docker exec messaging-server-3 cat /data/server_data.json
-
-# Ver dados do reference
-docker exec messaging-reference cat /data/reference_data.json
-
-# Status dos containers
-docker-compose ps
-
-# Logs específicos
-docker-compose logs -f server-1
-docker-compose logs -f reference
-docker-compose logs -f broker
-```
-
----
-
-## 🐛 Troubleshooting
-
-### Cliente não conecta
-- Verifique containers: `docker-compose ps`
-- Veja logs: `docker-compose logs server-1`
-- Reinicie: `docker-compose restart server-1`
-
-### Mensagens não chegam
-- Verifique broker: `docker-compose ps broker`
-- Cliente inscrito no canal? (opção 5)
-- Logs do broker: `docker-compose logs broker`
-
-### Replicação não funciona
-- Verifique se 3 servidores estão ativos
-- Veja logs: `docker-compose logs | grep "Replicando"`
-- Verifique coordenador: `docker-compose logs | grep "Coordenador"`
-
-### Erro ao buildar
-- Limpe: `docker-compose down -v`
-- Rebuild: `docker-compose build --no-cache`
-
-### Dados não persistem
-- Verifique volumes: `docker volume ls | grep messaging`
-- Veja conteúdo: `docker exec messaging-server-1 ls -la /data`
-
----
-
-## 👥 Desenvolvimento
-
-**Linguagens utilizadas:**
-- **Go** (Server) - Request-Reply, Pub, Relógios, Replicação
-- **JavaScript/Node.js** (Client) - CLI interativo
-- **Python** (Broker, Reference, Auto-client)
-
-**Padrões implementados:**
-- Request-Reply (REQ-REP)
-- Publisher-Subscriber (PUB-SUB, XSUB-XPUB)
-- Relógio Lógico de Lamport
-- Sincronização de Berkeley
-- Eleição Bully
-- Primary-Backup com Replicação Assíncrona
+✅ **Parte 1**: Request-Reply - COMPLETA  
+✅ **Parte 2**: Publisher-Subscriber - COMPLETA  
+✅ **Parte 3**: MessagePack - COMPLETA  
+✅ **Parte 4**: Relógios - COMPLETA  
+✅ **Parte 5**: Replicação - COMPLETA  
 
 ---
 
 ## 📄 Licença
 
 MIT
-
----
-
-## 🎉 Status do Projeto
-
-✅ **Parte 1**: Request-Reply - COMPLETA  
-✅ **Parte 2**: Publisher-Subscriber - COMPLETA  
-✅ **Parte 3**: MessagePack - COMPLETA  
-✅ **Parte 4**: Relógios (5 etapas) - COMPLETA  
-✅ **Parte 5**: Consistência e Replicação - COMPLETA  
-
-**Projeto 100% Concluído! 🎊**
