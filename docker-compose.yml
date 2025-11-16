@@ -101,7 +101,6 @@ services:
       - messaging-network
     stdin_open: true
     tty: true
-    restart: unless-stopped
 
   # Cliente automatizado 1
   auto-client-1:
@@ -110,7 +109,7 @@ services:
       context: ./client
       dockerfile: Dockerfile.auto
     environment:
-      - SERVER_URL=tcp://server-1:5555     # <--- AGORA DEFINIDO
+      - SERVER_URL=tcp://server-1:5555
       - BROKER_URL=tcp://broker:5558
     depends_on:
       - broker
@@ -125,7 +124,7 @@ services:
       context: ./client
       dockerfile: Dockerfile.auto
     environment:
-      - SERVER_URL=tcp://server-2:5555     # <--- balanceado
+      - SERVER_URL=tcp://server-2:5555
       - BROKER_URL=tcp://broker:5558
     depends_on:
       - broker
