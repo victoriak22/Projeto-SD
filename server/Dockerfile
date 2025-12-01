@@ -16,7 +16,7 @@ COPY go.mod go.sum* ./
 RUN go mod download
 
 # Copiar código fonte
-COPY main.go ./
+COPY . .
 
 # Compilar aplicação
 RUN go build -o server main.go
